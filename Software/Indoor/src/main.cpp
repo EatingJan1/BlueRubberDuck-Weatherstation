@@ -8,7 +8,7 @@ const char *ssid = ssid_d;
 const char *password = password_d;
 
 
-#if defined(co2_messure) and (co2_messure == true)
+#if !defined(co2_messure) or (co2_messure == true)
   #include "LIB/Matter/matter_endpoints/MatterAirQualitySensor.h"
   #include <MHZ19.h>
   #include <SoftwareSerial.h>
@@ -19,8 +19,39 @@ const char *password = password_d;
   MatterAirQualitySensor CO2;
 #endif
 
+#if !defined(wind_messure) or (wind_messure == true)
+  #include "LIB/Anemometer/MCAnemometer.h"
 
-#if defined(BME_ADDR) and !(BME_temp == false and BME_hum == false and BME_pres == false)
+  Anemometer anemometer = Anemometer(Trigger_1, Echo_1, Trigger_2, Echo_2, Trigger_3, Echo_3, Trigger_4, Echo_4, distance_wind);
+#endif
+
+#if !defined(Rain_messure) or (Rain_messure == true)
+  #include "LIB/Matter/matter_endpoints/MatterFlowSensor.h"
+
+  MatterFlowSensor RainFlow;
+
+#endif
+
+#if (!defined(Rain_detect) or (Rain_detect == true)) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+  #include "LIB/Matter/matter_endpoints/MatterRainSensorSensor.h"
+
+  MatterRainSensor Rain;
+#endif
+
+#if (!defined(Rain_detect) or (Rain_detect == true) or (!defined(Rain_messure) or (Rain_messure == true))) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+  #include "LIB/Hyetometer/mwippe.h"
+  #include "LIB/average_per_time/average_per_time.h"
+  #if defined(Reed1_Pin) and defined(Reed2_Pin)
+    mwippe rain_reed = mwippe(Reed1_Pin, Reed2_Pin, rainunit);
+  #elif defined(Reed1_Pin)
+    mwippe rain_reed = mwippe(Reed1_Pin, rainunit);
+  #elif defined(Reed2_Pin)
+    mwippe rain_reed = mwippe(Reed2_Pin, rainunit);
+  #endif
+  AveragePerTime perHour;
+#endif
+
+#if defined(BME_ADDR) or !(BME_temp == false and BME_hum == false and BME_pres == false)
   #include <bme68xLibrary.h>
   Bme68x bme;
 
@@ -37,7 +68,7 @@ const char *password = password_d;
   #endif
 #endif
 
-#if defined(AL_ADDR) and AL_light == true
+#if defined(AL_ADDR) or AL_light == true
   #include <SparkFun_VEML6030_Ambient_Light_Sensor.h>
   #include "LIB/Matter/matter_endpoints/MatterLightSensor.h"
   SparkFun_Ambient_Light light_I2C(AL_ADDR);
@@ -111,7 +142,7 @@ uint32_t button_time_stamp = 0;
 bool button_state = false;                     
 uint32_t time_diff = 0;
 const uint32_t decommissioningTimeout = 20000;
-const uint32_t co2timer = 5000;
+const uint32_t calibratetime = 5000;
 
 
 void setup() {
@@ -177,13 +208,21 @@ void setup() {
     Light.begin();
   #endif
   
+  #if !defined(Rain_messure) or (Rain_messure == true)
+    RainFlow.begin();
+  #endif
+
+  #if (!defined(Rain_detect) or (Rain_detect == true)) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+    Rain.begin();
+  #endif
 
   Matter.begin();
 
 
   if (!Matter.isDeviceCommissioned()) {
     Serial.println("");
-    Serial.println("Indoor weather Station is not commissioned yet.");
+    Serial.print(wsname);
+    Serial.println(" is not commissioned yet.");
     Serial.println("Initiate the device discovery in your Matter environment.");
     Serial.println("Commission it to your Matter hub with the Matter Label");
     Serial.printf("Manual pairing code: %s\r\n", Matter.getManualPairingCode().c_str());
@@ -200,11 +239,13 @@ void setup() {
     while (!Matter.isDeviceCommissioned()) {
       delay(100);
       if ((timeCount++ % 100) == 0) {
-        Serial.println("Indoor weather Station not commissioned yet. Waiting for commissioning.");
+        Serial.print(wsname);
+        Serial.println(" not commissioned yet. Waiting for commissioning.");
       }
     }
     
-    Serial.println("Indoor weather Station is commissioned and connected to Wi-Fi. Ready for use.");
+    Serial.print(wsname);
+    Serial.println(" is commissioned and connected to Wi-Fi. Ready for use.");
     #if defined(NUM_PIXELS) and defined(WS2812_Pin) and !(ledmode == 0)
       Led.setAnimation(AnimationType::None);
     #endif
@@ -262,6 +303,13 @@ void setup() {
 void loop() {
   static uint32_t timeCounter = 0;
 
+  #if Rain_messure or Rain_detect
+    if(rain_reed.runcheckerwipp())
+    {
+      perHour.add(1);
+    }
+  #endif
+
   if (!(timeCounter++ % 10)) { 
     //TODO: For long term use Change Time %300(5min) or %600(10min) or % 900(15min)
     #if defined(BME_ADDR) and !(BME_temp == false and BME_hum == false and BME_pres == false)
@@ -301,6 +349,32 @@ void loop() {
 
       setaqilight(CO2.getAirQuality());
     #endif
+    
+    #if (!defined(Rain_detect) or (Rain_detect == true) or (!defined(Rain_messure) or (Rain_messure == true))) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+      float m3 = perHour.getSum(3600000UL)/1000;
+    #endif
+
+    #if !defined(Rain_detect) or (Rain_detect == true) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+      if(m3>0)//TODO: In next Version, check rain from last 15 minuts
+      {
+        Rain.setRain(1);
+      }
+      else
+      {
+        Rain.setRain(0);
+      }
+    #endif
+
+    #if !defined(Rain_messure) or (Rain_messure == true) and (defined(Reed1_Pin) or defined(Reed2_Pin))
+      RainFlow.setFlow(m3);
+    #endif
+
+    #if !defined(wind_messure) or (wind_messure == true)
+      anemometer.readstate();
+      log_i("Angle: %f", anemometer.getangle());
+      log_i("Speed: %f", anemometer.getspeed());
+      log_i("Guest: %f", anemometer.getgustswind());
+    #endif
   }
 
   if (digitalRead(Button_Pin) == LOW and !button_state) {
@@ -319,11 +393,16 @@ void loop() {
   
 
 
-  if (time_diff > co2timer and decommissioningTimeout > time_diff)
+  if (time_diff > calibratetime and decommissioningTimeout > time_diff)
   {
     #if defined(co2_messure) and (co2_messure == true)
       Serial.println("Co2 calibrate Mode");
       mhz19.calibrate();
+    #endif
+
+    #if !defined(wind_messure) or (wind_messure == true)
+      Serial.println("Anemometer calibrate Mode");
+      anemometer.calibrate();
     #endif
 
     #if defined(NUM_PIXELS) and defined(WS2812_Pin) and !(ledmode == 0)
@@ -342,7 +421,7 @@ void loop() {
   
   if (time_diff > decommissioningTimeout)
   {
-    Serial.println("Decommissioning Indoor weather Station. It shall be commissioned again."); 
+    Serial.printf("Decommissioning %c. It shall be commissioned again.", wsname); 
     Matter.decommission();
     button_time_stamp = millis();
     time_diff = 0;
