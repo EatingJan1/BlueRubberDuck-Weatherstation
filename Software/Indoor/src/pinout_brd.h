@@ -1,6 +1,7 @@
 #ifndef PINOUT_H
 #define PINOUT_H
 
+#define wsname "Indoor weather Station"
 
 #define ssid_d "mein"
 #define password_d "passwort"
@@ -31,6 +32,7 @@
 #define Rain_detect true
 #define Reed1_Pin 3
 #define Reed2_Pin 2
+#define rainunit 0.05
 
 
 #define wind_messure true
