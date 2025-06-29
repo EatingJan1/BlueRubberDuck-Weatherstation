@@ -1,15 +1,12 @@
-[submodule "Software/Outdoor/src/LIB/Hyetometer"]
-	path = Software/Outdoor/src/LIB/Hyetometer
-	url = https://github.com/EatingJan1/MCHyetometer-REED
-[submodule "Software/Outdoor/src/LIB/Anemometer"]
-	path = Software/Outdoor/src/LIB/Anemometer
-	url = https://github.com/EatingJan1/MCAnemometer-Ultrasonic
-[submodule "Software/Outdoor/src/LIB/Matter"]
-	path = Software/Outdoor/src/LIB/Matter
-	url = https://github.com/EatingJan1/arduino-esp32-matter-extra-endpoints
 [submodule "Software/Indoor/src/LIB/Matter"]
 	path = Software/Indoor/src/LIB/Matter
 	url = https://github.com/EatingJan1/arduino-esp32-matter-extra-endpoints
 [submodule "Software/Indoor/src/LIB/LEDAnimation"]
 	path = Software/Indoor/src/LIB/LEDAnimation
 	url = https://github.com/EatingJan1/NeoPixel-Animation-lib
+[submodule "Software/Indoor/src/LIB/Anemometer"]
+	path = Software/Indoor/src/LIB/Anemometer
+	url = https://github.com/EatingJan1/MCAnemometer-Ultrasonic
+[submodule "Software/Indoor/src/LIB/Hyetometer"]
+	path = Software/Indoor/src/LIB/Hyetometer
+	url = https://github.com/EatingJan1/MCHyetometer-REED
